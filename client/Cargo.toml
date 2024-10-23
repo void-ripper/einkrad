@@ -1,0 +1,9 @@
+[package]
+name = "client"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+package = { path = "../package" }
+raylib-ffi = "5.0.2"
+rquickjs = { version = "0.6.2", features = ["macro"] }
