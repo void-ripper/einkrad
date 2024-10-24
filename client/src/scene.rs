@@ -2,19 +2,17 @@ use std::{
     collections::HashMap,
     ffi::c_int,
     os::raw::c_void,
-    sync::atomic::{AtomicU32, Ordering},
+    sync::{atomic::{AtomicU32, Ordering}, Arc, RwLock},
 };
 
-use package::{App, Message};
+use package::{App, };
 use raylib_ffi::{
-    colors, enums, rl_str, BeginMode3D, Camera, DrawModel, DrawSphereEx, EndMode3D,
-    GetShaderLocation, SetShaderValue, Shader, UpdateCamera, Vector3,
+     enums, rl_str, BeginMode3D, Camera, DrawSphereEx, EndMode3D, GetShaderLocation, Matrix, SetShaderValue, Shader, UpdateCamera, Vector3
 };
 use rquickjs::{class::Trace, Ctx, Exception};
 
 use crate::{
-    drawable::{Drawable, JsDrawable},
-    light::Light,
+    drawable::{Drawable, JsDrawable}, light::Light, message::ServiceMessage, node::JsNode
 };
 
 static ID_POOL: AtomicU32 = AtomicU32::new(1);
@@ -53,7 +51,7 @@ impl Scene {
 
         let shader = unsafe {
             raylib_ffi::LoadShader(
-                raylib_ffi::rl_str!("data/lighting.vs"),
+                raylib_ffi::rl_str!("data/lighting_instancing.vs"),
                 raylib_ffi::rl_str!("data/lighting.fs"),
             )
         };
@@ -66,8 +64,13 @@ impl Scene {
 
             let mat_model = shader
                 .locs
+                .offset(enums::ShaderLocationIndex::MatrixMvp as isize);
+            *mat_model = GetShaderLocation(shader, rl_str!("mvp"));
+
+            let mat_model = shader
+                .locs
                 .offset(enums::ShaderLocationIndex::MatrixModel as isize);
-            *mat_model = GetShaderLocation(shader, rl_str!("matModel"));
+            *mat_model = GetShaderLocation(shader, rl_str!("instanceTransform"));
 
             let ambient_loc = GetShaderLocation(shader, rl_str!("ambient"));
             let ambient_value = [0.1f32, 0.1f32, 0.1f32, 1.0f32].as_ptr();
@@ -95,11 +98,12 @@ impl Scene {
         }
     }
 
-    pub fn load(&mut self, file: String) -> u32 {
+    pub fn load(&mut self, file: String) -> (u32, Arc<RwLock<Vec<Matrix>>>) {
         let d = Drawable::new(self.shader.clone(), &file);
         let id = d.id;
+        let matrices = d.matrices.clone();
         self.drawables.insert(id, d);
-        id
+        (id, matrices)
     }
 
     pub fn draw(&mut self) {
@@ -120,16 +124,7 @@ impl Scene {
             BeginMode3D(self.camera);
 
             for drw in self.drawables.values() {
-                DrawModel(
-                    drw.model,
-                    Vector3 {
-                        x: 0.0,
-                        y: 0.0,
-                        z: 0.0,
-                    },
-                    1.0,
-                    colors::WHITE,
-                );
+                drw.draw();
             }
 
             DrawSphereEx(self.lights[0].position, 0.2, 8, 8, self.lights[0].color);
@@ -143,28 +138,29 @@ impl Scene {
 pub struct JsScene {
     #[qjs(skip_trace)]
     pub id: u32,
+    pub root: JsNode,
 }
 
 #[rquickjs::methods]
 impl JsScene {
     #[qjs(constructor)]
     pub fn new<'js>(ctx: Ctx<'js>, name: String) -> rquickjs::Result<Self> {
-        let app: App = ctx.globals().get("App").unwrap();
-        let answer = app.sync_send(Message::CreateScene(name));
+        let app: App<ServiceMessage> = ctx.globals().get("App").unwrap();
+        let answer = app.sync_send(ServiceMessage::CreateScene(name));
 
-        if let Message::CreatedScene(id) = answer {
-            Ok(Self { id })
+        if let ServiceMessage::CreatedScene(id) = answer {
+            Ok(Self { id, root: JsNode::new(), })
         } else {
             Err(Exception::throw_message(&ctx, "could not create scene"))
         }
     }
 
     pub fn load<'js>(&self, ctx: Ctx<'js>, file: String) -> rquickjs::Result<JsDrawable> {
-        let app: App = ctx.globals().get("App").unwrap();
-        let answer = app.sync_send(Message::LoadDrawable(self.id, file));
+        let app: App<ServiceMessage> = ctx.globals().get("App").unwrap();
+        let answer = app.sync_send(ServiceMessage::LoadDrawable(self.id, file));
 
-        if let Message::LoadedDrawable(id) = answer {
-            Ok(JsDrawable { id })
+        if let ServiceMessage::LoadedDrawable(id, matrices) = answer {
+            Ok(JsDrawable { id, matrices })
         } else {
             Err(Exception::throw_message(&ctx, "could not load drawable"))
         }

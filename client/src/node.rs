@@ -1,17 +1,25 @@
-use std::sync::{atomic::{AtomicU64, Ordering}, Arc, RwLock};
+use std::{collections::HashMap, sync::{atomic::{AtomicU32, Ordering}, Arc, RwLock}};
 
 use rquickjs::class::Trace;
 
-static ID_POOL: AtomicU64 = AtomicU64::new(1);
+use crate::drawable::JsDrawable;
+
+static ID_POOL: AtomicU32 = AtomicU32::new(1);
 
 pub struct Node {
-    id: u64,
+    id: u32,
+    parent: Option<Arc<RwLock<Node>>>,
+    children: HashMap<u32, Arc<RwLock<Node>>>,
+    drawable: Option<u32>,
 }
 
 impl Node {
     pub fn new() -> Arc<RwLock<Self>> {
         Arc::new(RwLock::new(Self {
             id: ID_POOL.fetch_add(1, Ordering::SeqCst),
+            parent: None,
+            children: HashMap::new(),
+            drawable: None,
         }))
     }
 }
@@ -27,8 +35,15 @@ pub struct JsNode {
 impl JsNode {
     #[qjs(constructor)]
     pub fn new() -> Self {
+        let n = Node::new();
         Self {
-            inner: Node::new(),
+            inner: n,
         }
+    }
+
+    #[qjs(rename = "setDrawable")]
+    pub fn set_drawable(&self, drw: JsDrawable) {
+        self.inner.write().unwrap().drawable = Some(drw.id);
+        
     }
 }

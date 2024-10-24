@@ -5,8 +5,9 @@ use std::{
     sync::mpsc::{self, Sender},
 };
 
+use message::ServiceMessage;
 use node::JsNode;
-use package::{Message, Package};
+use package::Package;
 use raylib_ffi::{
     colors, enums::ConfigFlags, rl_str, BeginDrawing, ClearBackground, CloseWindow, DrawFPS,
     EndDrawing, InitWindow, SetConfigFlags, SetTargetFPS, WindowShouldClose,
@@ -16,6 +17,7 @@ use scene::{JsScene, Scene};
 
 mod drawable;
 mod light;
+mod message;
 mod node;
 mod scene;
 
@@ -52,7 +54,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         let entry = entry?;
         if entry.metadata()?.is_dir() {
             let gtx = gtx.clone();
-            match Package::load(entry.path(), move |c| {
+            match Package::<ServiceMessage>::load(entry.path(), move |c| {
                 let globals = c.globals();
                 Class::<JsScene>::define(&globals).unwrap();
                 Class::<JsNode>::define(&globals).unwrap();
@@ -87,21 +89,21 @@ fn main() -> Result<(), Box<dyn Error>> {
             for pk in plugins.iter() {
                 while let Ok(msg) = pk.service_rx.try_recv() {
                     match msg {
-                        Message::CreateScene(name) => {
+                        ServiceMessage::CreateScene(name) => {
                             println!("EINKRAD: create scene {}", name);
                             let s = Scene::new(name);
                             let id = s.id;
                             scenes.insert(s.id, s);
-                            pk.service_tx.send(Message::CreatedScene(id)).unwrap();
+                            pk.service_tx.send(ServiceMessage::CreatedScene(id)).unwrap();
                         }
-                        Message::LoadDrawable(scene_id, file) => {
+                        ServiceMessage::LoadDrawable(scene_id, file) => {
                             println!("EINKRAD: load drawable {} {}", scene_id, file);
                             if let Some(scene) = scenes.get_mut(&scene_id) {
                                 let did = scene.load(file);
-                                pk.service_tx.send(Message::LoadedDrawable(did)).unwrap();
+                                pk.service_tx.send(ServiceMessage::LoadedDrawable(did.0, did.1)).unwrap();
                             }
                         }
-                        Message::CreatedScene(_) | Message::LoadedDrawable(_) => {
+                        ServiceMessage::CreatedScene(_) | ServiceMessage::LoadedDrawable(..) => {
                             println!("we should not get this");
                         }
                     }

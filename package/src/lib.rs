@@ -8,7 +8,6 @@ use std::{
 };
 
 use error::PackageError;
-pub use message::Message;
 use rquickjs::{
     class::Trace,
     loader::{BuiltinResolver, FileResolver, NativeLoader, ScriptLoader},
@@ -16,34 +15,33 @@ use rquickjs::{
 };
 
 mod error;
-mod message;
 
 #[derive(Trace, Clone)]
 #[rquickjs::class]
-pub struct App {
+pub struct App<M> {
     #[qjs(skip_trace)]
-    service_tx: Sender<Message>,
+    service_tx: Sender<M>,
     #[qjs(skip_trace)]
-    service_rx: Arc<Receiver<Message>>,
+    service_rx: Arc<Receiver<M>>,
 }
 
-impl App {
-    pub fn sync_send(&self, msg: Message) -> Message {
+impl <M> App <M> {
+    pub fn sync_send(&self, msg: M) -> M {
         self.service_tx.send(msg).unwrap();
         self.service_rx.recv().unwrap()
     }
 }
 
-pub struct Package {
+pub struct Package<M> {
     pub msg_tx: Sender<String>,
-    pub service_rx: Receiver<Message>,
-    pub service_tx: Sender<Message>,
+    pub service_rx: Receiver<M>,
+    pub service_tx: Sender<M>,
 }
 
-fn init_package<'js>(
+fn init_package<'js, M>(
     c: Ctx<'js>,
-    service_tx: Sender<Message>,
-    service_rx: Receiver<Message>,
+    service_tx: Sender<M>,
+    service_rx: Receiver<M>,
 ) -> Result<(), PackageError> {
     c.globals()
         .set(
@@ -72,12 +70,12 @@ fn init_package<'js>(
     Ok(())
 }
 
-fn run_package<F>(
+fn run_package<F, M>(
     cb: F,
     root: PathBuf,
     msg_rx: Receiver<String>,
-    service_tx: Sender<Message>,
-    service_rx: Receiver<Message>,
+    service_tx: Sender<M>,
+    service_rx: Receiver<M>,
 ) -> Result<(), PackageError>
 where
     F: Fn(Ctx),
@@ -122,8 +120,8 @@ where
     }
 }
 
-impl Package {
-    pub fn load<F>(root: PathBuf, cb: F) -> Result<Package, PackageError>
+impl <M> Package<M> where M: Send + 'static {
+    pub fn load<F>(root: PathBuf, cb: F) -> Result<Package<M>, PackageError>
     where
         F: Fn(Ctx) + Send + 'static,
     {
