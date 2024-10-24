@@ -10,5 +10,5 @@ edition = "2021"
 
 [workspace]
 resolver = "2"
-members = ["client", "package"]
+members = ["client", "common", "package"]
 
