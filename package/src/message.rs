@@ -1,3 +1,4 @@
+#[derive(Debug)]
 pub enum Message {
     CreateScene(String),
     CreatedScene(u32),

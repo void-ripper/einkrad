@@ -4,14 +4,15 @@ use std::{
         mpsc::{self, Receiver, Sender},
         Arc,
     },
+    time::{Duration, SystemTime},
 };
 
 use error::PackageError;
 pub use message::Message;
 use rquickjs::{
     class::Trace,
-    loader::{FileResolver, ScriptLoader},
-    CatchResultExt, Context, Ctx, Function, Runtime,
+    loader::{BuiltinResolver, FileResolver, NativeLoader, ScriptLoader},
+    CatchResultExt, Context, Ctx, Function, Module, Runtime,
 };
 
 mod error;
@@ -53,9 +54,12 @@ fn init_package<'js>(
             },
         )
         .catch(&c)?;
-    c.eval::<(), _>(
+
+    Module::evaluate(
+        c.clone(),
+        "main",
         r#"
-                import {onStart, onUpdate, onMessage, name} from "./index.js";
+                import {onStart, onUpdate, onMessage, name} from "index.js";
                 globalThis.name = name;
                 globalThis.onUpdate = onUpdate;
                 globalThis.onMessage = onMessage;
@@ -64,6 +68,7 @@ fn init_package<'js>(
             "#,
     )
     .catch(&c)?;
+
     Ok(())
 }
 
@@ -80,10 +85,17 @@ where
     let rt = Runtime::new()?;
 
     rt.set_loader(
-        FileResolver::default().with_path(root.to_string_lossy().to_string()),
-        ScriptLoader::default(),
+        (
+            FileResolver::default()
+                .with_path(&root.to_string_lossy())
+                .with_native(),
+            BuiltinResolver::default(),
+        ),
+        (ScriptLoader::default(), NativeLoader::default()),
     );
-    let ctx = Context::base(&rt)?;
+    // BUG: base should work but crashes!
+    // let ctx = Context::base(&rt)?;
+    let ctx = Context::full(&rt)?;
 
     ctx.with(|c| {
         cb(c.clone());
@@ -91,17 +103,22 @@ where
     })?;
 
     loop {
-        ctx.with(|c| {
-            let on_message: Function = c.globals().get("onMessage").unwrap();
+        let start = SystemTime::now();
+
+        ctx.with(|c| -> Result<(), PackageError> {
+            let on_message: Function = c.globals().get("onMessage").catch(&c)?;
             while let Ok(msg) = msg_rx.try_recv() {
-                let ret: Result<(), _> = on_message.call((msg,)).catch(&c);
-                if let Err(e) = ret {
-                    println!("{e}");
-                }
+                let _: () = on_message.call((msg,)).catch(&c)?;
             }
 
-            let _: () = c.eval("onUpdate()").unwrap();
-        });
+            let _: () = c.eval("onUpdate()").catch(&c)?;
+
+            Ok(())
+        })?;
+
+        let elapsed = start.elapsed().unwrap();
+        let to_wait = Duration::from_millis(100) - elapsed;
+        std::thread::sleep(to_wait);
     }
 }
 
@@ -110,10 +127,10 @@ impl Package {
     where
         F: Fn(Ctx) + Send + 'static,
     {
-        println!("Package: try to load {}", root.display());
+        println!("PACKAGE: load {}", root.display());
         let indexjs = root.join("index.js");
 
-        if indexjs.exists() {
+        if !indexjs.exists() {
             return Err(PackageError::not_a_package());
         }
 
@@ -121,9 +138,9 @@ impl Package {
         let (rtx, rrx) = mpsc::channel();
         let (atx, arx) = mpsc::channel();
 
-        std::thread::spawn(|| {
-            if let Err(e) = run_package(cb, root, rx, rtx, arx) {
-                println!("Package: {e}");
+        std::thread::spawn(move || {
+            if let Err(e) = run_package(cb, root.clone(), rx, rtx, arx) {
+                println!("PACKAGE {}: {}", root.display(), e);
             }
         });
 

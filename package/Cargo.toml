@@ -4,4 +4,4 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
-rquickjs = { version = "0.6.2", features = ["loader", "macro"] }
+rquickjs = { version = "0.6.2", features = ["loader", "macro", "dyn-load"] }
