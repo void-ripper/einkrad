@@ -119,7 +119,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             BeginDrawing();
             ClearBackground(colors::WHITE);
 
-            if let Some(scene) = scenes.get(&active_scene) {
+            if let Some(scene) = scenes.get_mut(&active_scene) {
                 scene.draw();
             }
 

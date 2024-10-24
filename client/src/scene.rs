@@ -1,13 +1,14 @@
 use std::{
     collections::HashMap,
+    ffi::c_int,
     os::raw::c_void,
     sync::atomic::{AtomicU32, Ordering},
 };
 
 use package::{App, Message};
 use raylib_ffi::{
-    colors, enums, rl_str, BeginMode3D, Camera, DrawModel, EndMode3D, GetShaderLocation,
-    SetShaderValue, Shader, Vector3,
+    colors, enums, rl_str, BeginMode3D, Camera, DrawModel, DrawSphereEx, EndMode3D,
+    GetShaderLocation, SetShaderValue, Shader, UpdateCamera, Vector3,
 };
 use rquickjs::{class::Trace, Ctx, Exception};
 
@@ -101,8 +102,21 @@ impl Scene {
         id
     }
 
-    pub fn draw(&self) {
+    pub fn draw(&mut self) {
         unsafe {
+            UpdateCamera(&mut self.camera, enums::CameraMode::Orbital as i32);
+            let camera_pos = [
+                self.camera.position.x,
+                self.camera.position.y,
+                self.camera.position.z,
+            ]
+            .as_ptr();
+            SetShaderValue(
+                self.shader,
+                self.view_loc,
+                camera_pos as *mut c_void,
+                enums::ShaderUniformDataType::Ivec3 as c_int,
+            );
             BeginMode3D(self.camera);
 
             for drw in self.drawables.values() {
@@ -118,6 +132,7 @@ impl Scene {
                 );
             }
 
+            DrawSphereEx(self.lights[0].position, 0.2, 8, 8, self.lights[0].color);
             EndMode3D();
         }
     }
