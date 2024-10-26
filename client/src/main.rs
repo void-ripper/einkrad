@@ -93,17 +93,22 @@ fn main() -> Result<(), Box<dyn Error>> {
                             println!("EINKRAD: create scene {}", name);
                             let s = Scene::new(name);
                             let id = s.id;
+                            let root = s.root.clone();
                             scenes.insert(s.id, s);
-                            pk.service_tx.send(ServiceMessage::CreatedScene(id)).unwrap();
+                            pk.service_tx
+                                .send(ServiceMessage::CreatedScene(id, root))
+                                .unwrap();
                         }
                         ServiceMessage::LoadDrawable(scene_id, file) => {
                             println!("EINKRAD: load drawable {} {}", scene_id, file);
                             if let Some(scene) = scenes.get_mut(&scene_id) {
                                 let did = scene.load(file);
-                                pk.service_tx.send(ServiceMessage::LoadedDrawable(did.0, did.1)).unwrap();
+                                pk.service_tx
+                                    .send(ServiceMessage::LoadedDrawable(did.0, did.1))
+                                    .unwrap();
                             }
                         }
-                        ServiceMessage::CreatedScene(_) | ServiceMessage::LoadedDrawable(..) => {
+                        ServiceMessage::CreatedScene(..) | ServiceMessage::LoadedDrawable(..) => {
                             println!("we should not get this");
                         }
                     }

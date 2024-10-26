@@ -10,8 +10,9 @@ use std::{
 use error::PackageError;
 use rquickjs::{
     class::Trace,
+    function::Args,
     loader::{BuiltinResolver, FileResolver, NativeLoader, ScriptLoader},
-    CatchResultExt, Context, Ctx, Function, Module, Runtime,
+    CatchResultExt, Context, Ctx, Function, Module, Runtime, Value,
 };
 
 mod error;
@@ -25,7 +26,7 @@ pub struct App<M> {
     service_rx: Arc<Receiver<M>>,
 }
 
-impl <M> App <M> {
+impl<M> App<M> {
     pub fn sync_send(&self, msg: M) -> M {
         self.service_tx.send(msg).unwrap();
         self.service_rx.recv().unwrap()
@@ -53,7 +54,7 @@ fn init_package<'js, M>(
         )
         .catch(&c)?;
 
-    Module::evaluate(
+    let p = Module::evaluate(
         c.clone(),
         "main",
         r#"
@@ -66,6 +67,8 @@ fn init_package<'js, M>(
             "#,
     )
     .catch(&c)?;
+
+    p.finish::<()>().catch(&c)?;
 
     Ok(())
 }
@@ -96,6 +99,10 @@ where
     let ctx = Context::full(&rt)?;
 
     ctx.with(|c| {
+        let print = Function::new(c.clone(), |args: Value| {
+            println!("{:?}", args);
+        })?;
+        c.globals().set("print", print)?;
         cb(c.clone());
         init_package(c, service_tx, service_rx)
     })?;
@@ -120,7 +127,10 @@ where
     }
 }
 
-impl <M> Package<M> where M: Send + 'static {
+impl<M> Package<M>
+where
+    M: Send + 'static,
+{
     pub fn load<F>(root: PathBuf, cb: F) -> Result<Package<M>, PackageError>
     where
         F: Fn(Ctx) + Send + 'static,

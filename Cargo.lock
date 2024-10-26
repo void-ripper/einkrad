@@ -82,6 +82,7 @@ dependencies = [
 name = "client"
 version = "0.1.0"
 dependencies = [
+ "common",
  "package",
  "raylib-ffi",
  "rquickjs",

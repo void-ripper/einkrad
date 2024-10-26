@@ -1,18 +1,25 @@
 use std::{
-    collections::HashMap,
+    collections::{HashMap, VecDeque},
     ffi::c_int,
     os::raw::c_void,
-    sync::{atomic::{AtomicU32, Ordering}, Arc, RwLock},
+    sync::{
+        atomic::{AtomicU32, Ordering},
+        Arc, RwLock,
+    },
 };
 
-use package::{App, };
+use package::App;
 use raylib_ffi::{
-     enums, rl_str, BeginMode3D, Camera, DrawSphereEx, EndMode3D, GetShaderLocation, Matrix, SetShaderValue, Shader, UpdateCamera, Vector3
+    enums, rl_str, BeginMode3D, Camera, DrawSphereEx, EndMode3D, GetShaderLocation, SetShaderValue,
+    Shader, UpdateCamera, Vector3,
 };
 use rquickjs::{class::Trace, Ctx, Exception};
 
 use crate::{
-    drawable::{Drawable, JsDrawable}, light::Light, message::ServiceMessage, node::JsNode
+    drawable::{Drawable, DrawableInstances, JsDrawable},
+    light::Light,
+    message::ServiceMessage,
+    node::{JsNode, Node},
 };
 
 static ID_POOL: AtomicU32 = AtomicU32::new(1);
@@ -21,6 +28,7 @@ pub struct Scene {
     pub id: u32,
     pub name: String,
     pub drawables: HashMap<u32, Drawable>,
+    pub root: Arc<RwLock<Node>>,
     lights: Vec<Light>,
     pub camera: Camera,
     shader: Shader,
@@ -51,7 +59,8 @@ impl Scene {
 
         let shader = unsafe {
             raylib_ffi::LoadShader(
-                raylib_ffi::rl_str!("data/lighting_instancing.vs"),
+                // raylib_ffi::rl_str!("data/lighting_instancing.vs"),
+                raylib_ffi::rl_str!("data/lighting.vs"),
                 raylib_ffi::rl_str!("data/lighting.fs"),
             )
         };
@@ -92,21 +101,41 @@ impl Scene {
             name,
             lights: vec![light],
             drawables: HashMap::new(),
+            root: Node::new(),
             camera,
             shader,
             view_loc,
         }
     }
 
-    pub fn load(&mut self, file: String) -> (u32, Arc<RwLock<Vec<Matrix>>>) {
+    pub fn load(&mut self, file: String) -> (u32, DrawableInstances) {
         let d = Drawable::new(self.shader.clone(), &file);
         let id = d.id;
-        let matrices = d.matrices.clone();
+        let matrices = d.instances.clone();
         self.drawables.insert(id, d);
         (id, matrices)
     }
 
     pub fn draw(&mut self) {
+        let mut stack = VecDeque::new();
+        {
+            let mut r = self.root.write().unwrap();
+            r.transform_world = r.transform;
+        }
+        stack.push_back(self.root.clone());
+        while let Some(n) = stack.pop_front() {
+            let n = n.read().unwrap();
+            for c in n.children.values() {
+                let mut ci = c.write().unwrap();
+                ci.transform_world = n.transform_world;
+                ci.apply_transform();
+
+                if ci.children.len() > 0 {
+                    stack.push_back(c.clone());
+                }
+            }
+        }
+
         unsafe {
             UpdateCamera(&mut self.camera, enums::CameraMode::Orbital as i32);
             let camera_pos = [
@@ -138,6 +167,7 @@ impl Scene {
 pub struct JsScene {
     #[qjs(skip_trace)]
     pub id: u32,
+    #[qjs(get)]
     pub root: JsNode,
 }
 
@@ -148,8 +178,11 @@ impl JsScene {
         let app: App<ServiceMessage> = ctx.globals().get("App").unwrap();
         let answer = app.sync_send(ServiceMessage::CreateScene(name));
 
-        if let ServiceMessage::CreatedScene(id) = answer {
-            Ok(Self { id, root: JsNode::new(), })
+        if let ServiceMessage::CreatedScene(id, root) = answer {
+            Ok(Self {
+                id,
+                root: JsNode { inner: root },
+            })
         } else {
             Err(Exception::throw_message(&ctx, "could not create scene"))
         }
@@ -159,8 +192,8 @@ impl JsScene {
         let app: App<ServiceMessage> = ctx.globals().get("App").unwrap();
         let answer = app.sync_send(ServiceMessage::LoadDrawable(self.id, file));
 
-        if let ServiceMessage::LoadedDrawable(id, matrices) = answer {
-            Ok(JsDrawable { id, matrices })
+        if let ServiceMessage::LoadedDrawable(id, instances) = answer {
+            Ok(JsDrawable { id, instances })
         } else {
             Err(Exception::throw_message(&ctx, "could not load drawable"))
         }

@@ -1,12 +1,11 @@
 use std::sync::{Arc, RwLock};
 
-use raylib_ffi::Matrix;
-
+use crate::{drawable::DrawableInstances, node::Node};
 
 #[derive(Clone)]
 pub enum ServiceMessage {
     CreateScene(String),
-    CreatedScene(u32),
+    CreatedScene(u32, Arc<RwLock<Node>>),
     LoadDrawable(u32, String),
-    LoadedDrawable(u32, Arc<RwLock<Vec<Matrix>>>),
+    LoadedDrawable(u32, DrawableInstances),
 }

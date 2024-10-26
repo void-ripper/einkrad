@@ -53,7 +53,7 @@ pub fn scale(m: &mut [f32; 16], v: &[f32; 3]) {
     m[11] = v[2] * m[11];
 }
 
-pub fn mul_assign(m: &mut [f32; 16], o: &[f32; 3]) {
+pub fn mul_assign(m: &mut [f32; 16], o: &[f32; 16]) {
     let tm0 = o[0] * m[0] + o[1] * m[4] + o[2] * m[8] + o[3] * m[12];
     let tm1 = o[0] * m[1] + o[1] * m[5] + o[2] * m[9] + o[3] * m[13];
     let tm2 = o[0] * m[2] + o[1] * m[6] + o[2] * m[10] + o[3] * m[14];
@@ -447,7 +447,7 @@ pub fn rotate_z(m: &mut [f32; 16], v: f32) {
     m[7] = tm_7;
 }
 
-pub fn get_rotation(m: &mut [f32; 16])-> [f32; 4] {
+pub fn get_rotation(m: &mut [f32; 16]) -> [f32; 4] {
     let tr = m[0] + m[5] + m[10];
     let mut s = 0.0;
     let mut qw = 0.0;
@@ -461,22 +461,19 @@ pub fn get_rotation(m: &mut [f32; 16])-> [f32; 4] {
         qx = (m[6] - m[9]) / s;
         qy = (m[8] - m[2]) / s;
         qz = (m[1] - m[4]) / s;
-    }
-    else if (m[0] > m[5]) & (m[0] > m[10]) {
+    } else if (m[0] > m[5]) & (m[0] > m[10]) {
         s = (1.0 + m[0] - m[5] - m[10]).sqrt() * 2.0; // S=4*qx
         qw = (m[6] - m[9]) / s;
         qx = 0.25 * s;
         qy = (m[4] + m[1]) / s;
         qz = (m[8] + m[2]) / s;
-    }
-    else if m[5] > m[10] {
-    s = (1.0 + m[5] - m[0] - m[10]).sqrt() * 2.0; // S=4*qy
+    } else if m[5] > m[10] {
+        s = (1.0 + m[5] - m[0] - m[10]).sqrt() * 2.0; // S=4*qy
         qw = (m[8] - m[2]) / s;
         qx = (m[4] + m[1]) / s;
         qy = 0.25 * s;
         qz = (m[9] + m[6]) / s;
-    }
-    else {
+    } else {
         s = (1.0 + m[10] - m[0] - m[5]).sqrt() * 2.0; // S=4*qz
         qw = (m[1] - m[4]) / s;
         qx = (m[8] + m[2]) / s;
@@ -497,16 +494,15 @@ pub fn get_angle(m: &[f32; 16]) -> [f32; 3] {
     if m[0] < 0.0 {
         if yaw >= 0.0 {
             yaw = PI - yaw;
-        }
-        else {
-            yaw =-PI - yaw;
+        } else {
+            yaw = -PI - yaw;
         }
     }
 
     // find roll (around z-axis) and pitch (around x-axis)
     // if forward vector is (1,0,0) or (-1,0,0), then m[0]=m[4]=m[9]=m[10]=0
     // if m[0] > -EPSILON and m[0] < EPSILON:
-    let roll  = 0.0;  //@@ assume roll=0
+    let roll = 0.0; //@@ assume roll=0
     let pitch = m[5].atan2(m[4]);
     // else:
     //     roll = atan2(m[1], m[0])
