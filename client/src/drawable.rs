@@ -70,11 +70,7 @@ impl Drawable {
         for (i, n) in instaces.values().enumerate() {
             let n = n.read().unwrap();
             matrix_2_raylib(&n.transform_world, &mut matrices[i]);
-            // unsafe {
-            // DrawMesh(*self.model.meshes.offset(0), self.material, matrices[i]);
-            // }
         }
-        // BUG: should work, but does not
         unsafe {
             DrawMeshInstanced(
                 *self.model.meshes.offset(0),
