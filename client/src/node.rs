@@ -6,7 +6,7 @@ use std::{
     },
 };
 
-use raylib_ffi::Matrix;
+use raylib_sys::Matrix;
 use rquickjs::class::Trace;
 
 use crate::drawable::{DrawableInstances, JsDrawable};

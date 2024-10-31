@@ -9,9 +9,10 @@ use std::{
 };
 
 use package::App;
-use raylib_ffi::{
-    enums, rl_str, BeginMode3D, Camera, DrawSphereEx, EndMode3D, GetShaderLocation,
-    GetShaderLocationAttrib, SetShaderValue, Shader, UpdateCamera, Vector3,
+use raylib_sys::{
+    BeginMode3D, Camera, CameraProjection, DrawSphereEx, EndMode3D, GetShaderLocation,
+    GetShaderLocationAttrib, LoadShader, SetShaderValue, Shader, ShaderLocationIndex,
+    ShaderUniformDataType, Vector3,
 };
 use rquickjs::{class::Trace, Ctx, Exception};
 
@@ -20,6 +21,7 @@ use crate::{
     light::Light,
     message::ServiceMessage,
     node::{JsNode, Node},
+    rl_str,
 };
 
 static ID_POOL: AtomicU32 = AtomicU32::new(1);
@@ -54,31 +56,31 @@ impl Scene {
                 z: 0.0,
             },
             fovy: 45.0,
-            projection: enums::CameraProjection::Perspective as i32,
+            projection: CameraProjection::CAMERA_PERSPECTIVE as i32,
         };
 
         let shader = unsafe {
-            raylib_ffi::LoadShader(
-                raylib_ffi::rl_str!("data/lighting_instancing.vs"),
-                // raylib_ffi::rl_str!("data/lighting.vs"),
-                raylib_ffi::rl_str!("data/lighting.fs"),
+            LoadShader(
+                rl_str!("data/lighting_instancing.vs"),
+                // rl_str!("data/lighting.vs"),
+                rl_str!("data/lighting.fs"),
             )
         };
 
         let view_loc = unsafe {
             let view_loc = shader
                 .locs
-                .offset(enums::ShaderLocationIndex::VectorView as isize);
+                .offset(ShaderLocationIndex::SHADER_LOC_VERTEX_POSITION as isize);
             *view_loc = GetShaderLocation(shader, rl_str!("viewPos"));
 
             let mat_model = shader
                 .locs
-                .offset(enums::ShaderLocationIndex::MatrixMvp as isize);
+                .offset(ShaderLocationIndex::SHADER_LOC_MATRIX_MVP as isize);
             *mat_model = GetShaderLocation(shader, rl_str!("mvp"));
 
             let mat_model = shader
                 .locs
-                .offset(enums::ShaderLocationIndex::MatrixModel as isize);
+                .offset(ShaderLocationIndex::SHADER_LOC_MATRIX_MODEL as isize);
             *mat_model = GetShaderLocationAttrib(shader, rl_str!("instanceTransform"));
 
             let ambient_loc = GetShaderLocation(shader, rl_str!("ambient"));
@@ -87,7 +89,7 @@ impl Scene {
                 shader,
                 ambient_loc,
                 ambient_value as *const c_void,
-                enums::ShaderUniformDataType::Ivec4 as i32,
+                ShaderUniformDataType::SHADER_UNIFORM_IVEC4 as i32,
             );
 
             *view_loc
@@ -148,7 +150,7 @@ impl Scene {
                 self.shader,
                 self.view_loc,
                 camera_pos as *mut c_void,
-                enums::ShaderUniformDataType::Ivec3 as c_int,
+                ShaderUniformDataType::SHADER_UNIFORM_IVEC3 as c_int,
             );
             BeginMode3D(self.camera);
 

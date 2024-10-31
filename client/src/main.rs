@@ -8,9 +8,9 @@ use std::{
 use message::ServiceMessage;
 use node::JsNode;
 use package::Package;
-use raylib_ffi::{
-    colors, enums::ConfigFlags, rl_str, BeginDrawing, ClearBackground, CloseWindow, DrawFPS,
-    EndDrawing, InitWindow, SetConfigFlags, SetTargetFPS, WindowShouldClose,
+use raylib_sys::{
+    BeginDrawing, ClearBackground, CloseWindow, Color, ConfigFlags, DrawFPS, EndDrawing,
+    InitWindow, SetConfigFlags, SetTargetFPS, WindowShouldClose,
 };
 use rquickjs::{class::Trace, Class};
 use scene::{JsScene, Scene};
@@ -20,6 +20,13 @@ mod light;
 mod message;
 mod node;
 mod scene;
+
+#[macro_export]
+macro_rules! rl_str {
+    ($expression:expr) => {
+        format!("{}\0", $expression).as_ptr() as *const i8
+    };
+}
 
 enum GameMessage {
     SetLevel(u32),
@@ -80,7 +87,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     unsafe {
-        SetConfigFlags(ConfigFlags::Msaa4xHint as u32);
+        SetConfigFlags(ConfigFlags::FLAG_MSAA_4X_HINT as u32);
         InitWindow(1024, 768, rl_str!("Einkrad"));
         SetTargetFPS(60);
 
@@ -124,7 +131,12 @@ fn main() -> Result<(), Box<dyn Error>> {
             }
 
             BeginDrawing();
-            ClearBackground(colors::WHITE);
+            ClearBackground(Color {
+                r: 255,
+                g: 255,
+                b: 255,
+                a: 255,
+            });
 
             if let Some(scene) = scenes.get_mut(&active_scene) {
                 scene.draw();

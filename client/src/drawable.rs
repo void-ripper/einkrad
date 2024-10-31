@@ -3,13 +3,10 @@ use std::{
     sync::{atomic::AtomicU32, Arc, RwLock},
 };
 
-use raylib_ffi::{
-    rl_str, DrawMesh, DrawMeshInstanced, DrawModel, LoadModel, Material, Matrix, Model, Shader,
-    UnloadModel,
-};
+use raylib_sys::{DrawMeshInstanced, LoadModel, Material, Matrix, Model, Shader, UnloadModel};
 use rquickjs::class::Trace;
 
-use crate::node::Node;
+use crate::{node::Node, rl_str};
 
 static ID_POOL: AtomicU32 = AtomicU32::new(1);
 
@@ -73,9 +70,9 @@ impl Drawable {
         for (i, n) in instaces.values().enumerate() {
             let n = n.read().unwrap();
             matrix_2_raylib(&n.transform_world, &mut matrices[i]);
-            unsafe {
-                // DrawMesh(*self.model.meshes.offset(0), self.material, matrices[i]);
-            }
+            // unsafe {
+            // DrawMesh(*self.model.meshes.offset(0), self.material, matrices[i]);
+            // }
         }
         // BUG: should work, but does not
         unsafe {
