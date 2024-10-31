@@ -109,4 +109,10 @@ impl JsNode {
         let x = [m[0], m[1], m[2]];
         common::matrix::translate(&mut n.transform, &x);
     }
+
+    #[qjs(rename = "rotateY")]
+    pub fn rotate_y(&self, a: f32) {
+        let mut n = self.inner.write().unwrap();
+        common::matrix::rotate_y(&mut n.transform, a);
+    }
 }

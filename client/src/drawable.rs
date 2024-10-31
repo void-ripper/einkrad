@@ -74,18 +74,18 @@ impl Drawable {
             let n = n.read().unwrap();
             matrix_2_raylib(&n.transform_world, &mut matrices[i]);
             unsafe {
-                DrawMesh(*self.model.meshes.offset(0), self.material, matrices[i]);
+                // DrawMesh(*self.model.meshes.offset(0), self.material, matrices[i]);
             }
         }
         // BUG: should work, but does not
-        // unsafe {
-        //     DrawMeshInstanced(
-        //         *self.model.meshes.offset(0),
-        //         self.material,
-        //         matrices.as_ptr(),
-        //         matrices.len() as _,
-        //     );
-        // }
+        unsafe {
+            DrawMeshInstanced(
+                *self.model.meshes.offset(0),
+                self.material,
+                matrices.as_ptr(),
+                matrices.len() as _,
+            );
+        }
     }
 }
 

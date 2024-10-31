@@ -1,5 +1,6 @@
 [profile.release]
 strip = true
+opt-level = 0
 
 [profile.dev]
 strip = true

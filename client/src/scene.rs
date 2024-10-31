@@ -10,8 +10,8 @@ use std::{
 
 use package::App;
 use raylib_ffi::{
-    enums, rl_str, BeginMode3D, Camera, DrawSphereEx, EndMode3D, GetShaderLocation, SetShaderValue,
-    Shader, UpdateCamera, Vector3,
+    enums, rl_str, BeginMode3D, Camera, DrawSphereEx, EndMode3D, GetShaderLocation,
+    GetShaderLocationAttrib, SetShaderValue, Shader, UpdateCamera, Vector3,
 };
 use rquickjs::{class::Trace, Ctx, Exception};
 
@@ -59,8 +59,8 @@ impl Scene {
 
         let shader = unsafe {
             raylib_ffi::LoadShader(
-                // raylib_ffi::rl_str!("data/lighting_instancing.vs"),
-                raylib_ffi::rl_str!("data/lighting.vs"),
+                raylib_ffi::rl_str!("data/lighting_instancing.vs"),
+                // raylib_ffi::rl_str!("data/lighting.vs"),
                 raylib_ffi::rl_str!("data/lighting.fs"),
             )
         };
@@ -79,7 +79,7 @@ impl Scene {
             let mat_model = shader
                 .locs
                 .offset(enums::ShaderLocationIndex::MatrixModel as isize);
-            *mat_model = GetShaderLocation(shader, rl_str!("instanceTransform"));
+            *mat_model = GetShaderLocationAttrib(shader, rl_str!("instanceTransform"));
 
             let ambient_loc = GetShaderLocation(shader, rl_str!("ambient"));
             let ambient_value = [0.1f32, 0.1f32, 0.1f32, 1.0f32].as_ptr();
@@ -137,7 +137,7 @@ impl Scene {
         }
 
         unsafe {
-            UpdateCamera(&mut self.camera, enums::CameraMode::Orbital as i32);
+            // UpdateCamera(&mut self.camera, enums::CameraMode::Orbital as i32);
             let camera_pos = [
                 self.camera.position.x,
                 self.camera.position.y,
