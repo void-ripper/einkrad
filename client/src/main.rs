@@ -6,14 +6,14 @@ use std::{
 };
 
 use message::ServiceMessage;
-use node::JsNode;
+use mlua::AnyUserData;
+use node::{LuaNode, Node};
 use package::Package;
 use raylib_sys::{
     BeginDrawing, ClearBackground, CloseWindow, Color, ConfigFlags, DrawFPS, EndDrawing,
     InitWindow, SetConfigFlags, SetTargetFPS, WindowShouldClose,
 };
-use rquickjs::{class::Trace, Class};
-use scene::{JsScene, Scene};
+use scene::{lua_scene_new, LuaScene, Scene};
 
 mod drawable;
 mod light;
@@ -32,20 +32,30 @@ enum GameMessage {
     SetLevel(u32),
 }
 
-#[derive(Trace, Clone)]
-#[rquickjs::class]
 struct Game {
-    #[qjs(skip_trace)]
     tx: Sender<GameMessage>,
-    #[qjs(rename = "isServer")]
     is_server: bool,
 }
 
-#[rquickjs::methods]
-impl Game {
-    #[qjs(rename = "setScene")]
-    pub fn set_scene(&self, scene: JsScene) {
-        self.tx.send(GameMessage::SetLevel(scene.id)).unwrap();
+impl mlua::UserData for Game {
+    fn add_fields<F: mlua::UserDataFields<Self>>(fields: &mut F) {
+        fields.add_field_method_get("isServer", |_lua, me| Ok(me.is_server));
+    }
+
+    fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {
+        methods.add_method("newNode", |_lua, _me, _: ()| {
+            Ok(LuaNode { inner: Node::new() })
+        });
+
+        methods.add_method("newScene", |lua, _me, name: String| {
+            lua_scene_new(lua, name)
+        });
+
+        methods.add_method("setScene", |_lua, me, scene: AnyUserData| {
+            let id = scene.borrow_scoped(|s: &LuaScene| s.id)?;
+            me.tx.send(GameMessage::SetLevel(id)).unwrap();
+            Ok(())
+        });
     }
 }
 
@@ -63,8 +73,6 @@ fn main() -> Result<(), Box<dyn Error>> {
             let gtx = gtx.clone();
             match Package::<ServiceMessage>::load(entry.path(), move |c| {
                 let globals = c.globals();
-                Class::<JsScene>::define(&globals).unwrap();
-                Class::<JsNode>::define(&globals).unwrap();
 
                 globals
                     .set(

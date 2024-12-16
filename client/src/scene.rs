@@ -8,19 +8,19 @@ use std::{
     },
 };
 
+use mlua::{AnyUserData, UserData};
 use package::App;
 use raylib_sys::{
     BeginMode3D, Camera, CameraProjection, DrawSphereEx, EndMode3D, GetShaderLocation,
     GetShaderLocationAttrib, LoadShader, SetShaderValue, Shader, ShaderLocationIndex,
     ShaderUniformDataType, Vector3,
 };
-use rquickjs::{class::Trace, Ctx, Exception};
 
 use crate::{
-    drawable::{Drawable, DrawableInstances, JsDrawable},
+    drawable::{Drawable, DrawableInstances, LuaDrawable},
     light::Light,
     message::ServiceMessage,
-    node::{JsNode, Node},
+    node::{LuaNode, Node},
     rl_str,
 };
 
@@ -111,7 +111,7 @@ impl Scene {
     }
 
     pub fn load(&mut self, file: String) -> (u32, DrawableInstances) {
-        let d = Drawable::new(self.shader.clone(), &file);
+        let d = Drawable::new(self.shader, &file);
         let id = d.id;
         let matrices = d.instances.clone();
         self.drawables.insert(id, d);
@@ -132,7 +132,7 @@ impl Scene {
                 ci.transform_world = n.transform_world;
                 ci.apply_transform();
 
-                if ci.children.len() > 0 {
+                if !ci.children.is_empty() {
                     stack.push_back(c.clone());
                 }
             }
@@ -164,40 +164,46 @@ impl Scene {
     }
 }
 
-#[derive(Trace, Clone)]
-#[rquickjs::class(rename = "Scene")]
-pub struct JsScene {
-    #[qjs(skip_trace)]
-    pub id: u32,
-    #[qjs(get)]
-    pub root: JsNode,
+pub fn lua_scene_new(lua: &mlua::Lua, name: String) -> mlua::Result<LuaScene> {
+    let answer = lua
+        .named_registry_value::<AnyUserData>("App")?
+        .borrow_scoped(|app: &App<ServiceMessage>| {
+            app.sync_send(ServiceMessage::CreateScene(name))
+        })?;
+
+    if let ServiceMessage::CreatedScene(id, root) = answer {
+        Ok(LuaScene {
+            id,
+            root: LuaNode { inner: root },
+        })
+    } else {
+        Err(mlua::Error::runtime("could not create scene"))
+    }
 }
 
-#[rquickjs::methods]
-impl JsScene {
-    #[qjs(constructor)]
-    pub fn new<'js>(ctx: Ctx<'js>, name: String) -> rquickjs::Result<Self> {
-        let app: App<ServiceMessage> = ctx.globals().get("App").unwrap();
-        let answer = app.sync_send(ServiceMessage::CreateScene(name));
+pub struct LuaScene {
+    pub id: u32,
+    pub root: LuaNode,
+}
 
-        if let ServiceMessage::CreatedScene(id, root) = answer {
-            Ok(Self {
-                id,
-                root: JsNode { inner: root },
-            })
-        } else {
-            Err(Exception::throw_message(&ctx, "could not create scene"))
-        }
+impl UserData for LuaScene {
+    fn add_fields<F: mlua::UserDataFields<Self>>(fields: &mut F) {
+        fields.add_field_method_get("root", |_lua, me| Ok(me.root.clone()));
     }
 
-    pub fn load<'js>(&self, ctx: Ctx<'js>, file: String) -> rquickjs::Result<JsDrawable> {
-        let app: App<ServiceMessage> = ctx.globals().get("App").unwrap();
-        let answer = app.sync_send(ServiceMessage::LoadDrawable(self.id, file));
+    fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {
+        methods.add_method("load", |lua, me, file: String| {
+            let answer = lua
+                .named_registry_value::<AnyUserData>("App")?
+                .borrow_scoped(|app: &App<ServiceMessage>| {
+                    app.sync_send(ServiceMessage::LoadDrawable(me.id, file))
+                })?;
 
-        if let ServiceMessage::LoadedDrawable(id, instances) = answer {
-            Ok(JsDrawable { id, instances })
-        } else {
-            Err(Exception::throw_message(&ctx, "could not load drawable"))
-        }
+            if let ServiceMessage::LoadedDrawable(id, instances) = answer {
+                Ok(LuaDrawable { id, instances })
+            } else {
+                Err(mlua::Error::runtime("could not load drawable"))
+            }
+        });
     }
 }

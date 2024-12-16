@@ -3,7 +3,8 @@ use std::{error::Error, fmt::Display};
 #[derive(Debug)]
 pub enum PackageErrorKind {
     NotAPackage,
-    Js,
+    Lua,
+    Io,
 }
 
 #[derive(Debug)]
@@ -29,19 +30,19 @@ impl Display for PackageError {
     }
 }
 
-impl From<rquickjs::Error> for PackageError {
-    fn from(value: rquickjs::Error) -> Self {
+impl From<mlua::Error> for PackageError {
+    fn from(value: mlua::Error) -> Self {
         Self {
-            kind: PackageErrorKind::Js,
+            kind: PackageErrorKind::Lua,
             msg: value.to_string(),
         }
     }
 }
 
-impl<'js> From<rquickjs::CaughtError<'js>> for PackageError {
-    fn from(value: rquickjs::CaughtError<'js>) -> Self {
+impl From<std::io::Error> for PackageError {
+    fn from(value: std::io::Error) -> Self {
         Self {
-            kind: PackageErrorKind::Js,
+            kind: PackageErrorKind::Io,
             msg: value.to_string(),
         }
     }

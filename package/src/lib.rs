@@ -8,21 +8,12 @@ use std::{
 };
 
 use error::PackageError;
-use rquickjs::{
-    class::Trace,
-    function::Args,
-    loader::{BuiltinResolver, FileResolver, NativeLoader, ScriptLoader},
-    CatchResultExt, Context, Ctx, Function, Module, Runtime, Value,
-};
+use mlua::{Error, FromLua, Lua, UserData};
 
 mod error;
 
-#[derive(Trace, Clone)]
-#[rquickjs::class]
 pub struct App<M> {
-    #[qjs(skip_trace)]
     service_tx: Sender<M>,
-    #[qjs(skip_trace)]
     service_rx: Arc<Receiver<M>>,
 }
 
@@ -33,47 +24,15 @@ impl<M> App<M> {
     }
 }
 
+impl<M> UserData for App<M> {}
+
 pub struct Package<M> {
     pub msg_tx: Sender<String>,
     pub service_rx: Receiver<M>,
     pub service_tx: Sender<M>,
 }
 
-fn init_package<'js, M>(
-    c: Ctx<'js>,
-    service_tx: Sender<M>,
-    service_rx: Receiver<M>,
-) -> Result<(), PackageError> {
-    c.globals()
-        .set(
-            "App",
-            App {
-                service_tx,
-                service_rx: Arc::new(service_rx),
-            },
-        )
-        .catch(&c)?;
-
-    let p = Module::evaluate(
-        c.clone(),
-        "main",
-        r#"
-                import {onStart, onUpdate, onMessage, name} from "index.js";
-                globalThis.name = name;
-                globalThis.onUpdate = onUpdate;
-                globalThis.onMessage = onMessage;
-
-                onStart();
-            "#,
-    )
-    .catch(&c)?;
-
-    p.finish::<()>().catch(&c)?;
-
-    Ok(())
-}
-
-fn run_package<F, M>(
+fn run_package<F, M: 'static>(
     cb: F,
     root: PathBuf,
     msg_rx: Receiver<String>,
@@ -81,45 +40,53 @@ fn run_package<F, M>(
     service_rx: Receiver<M>,
 ) -> Result<(), PackageError>
 where
-    F: Fn(Ctx),
+    F: Fn(&Lua),
 {
-    let rt = Runtime::new()?;
+    let indexlua = root.join("index.luau");
+    let rt = Lua::new();
 
-    rt.set_loader(
-        (
-            FileResolver::default()
-                .with_path(&root.to_string_lossy())
-                .with_native(),
-            BuiltinResolver::default(),
-        ),
-        (ScriptLoader::default(), NativeLoader::default()),
-    );
-    // BUG: base should work but crashes!
-    // let ctx = Context::base(&rt)?;
-    let ctx = Context::full(&rt)?;
-
-    ctx.with(|c| {
-        let print = Function::new(c.clone(), |args: Value| {
+    {
+        let globals = rt.globals();
+        let print = rt.create_function(|_, args: mlua::Value| {
             println!("{:?}", args);
+            Ok(())
         })?;
-        c.globals().set("print", print)?;
-        cb(c.clone());
-        init_package(c, service_tx, service_rx)
-    })?;
+        globals.set("print", print)?;
+        let require = rt.create_function(move |_, filename: String| {
+            println!("load {}", root.join(filename).display());
+            Ok(())
+        })?;
+        globals.set("require", require)?;
+
+        cb(&rt);
+    }
+
+    rt.set_named_registry_value(
+        "App",
+        App {
+            service_tx,
+            service_rx: Arc::new(service_rx),
+        },
+    )?;
+
+    let data = std::fs::read_to_string(&indexlua)?;
+    rt.load(&data).exec()?;
+
+    let on_start: mlua::Function = rt.globals().get("OnStart")?;
+
+    let _: () = on_start.call(())?;
+
+    let on_message: mlua::Function = rt.globals().get("OnMessage")?;
+    let on_update: mlua::Function = rt.globals().get("OnUpdate")?;
 
     loop {
         let start = SystemTime::now();
 
-        ctx.with(|c| -> Result<(), PackageError> {
-            let on_message: Function = c.globals().get("onMessage").catch(&c)?;
-            while let Ok(msg) = msg_rx.try_recv() {
-                let _: () = on_message.call((msg,)).catch(&c)?;
-            }
+        while let Ok(msg) = msg_rx.try_recv() {
+            let _: () = on_message.call((msg,))?;
+        }
 
-            let _: () = c.eval("onUpdate()").catch(&c)?;
-
-            Ok(())
-        })?;
+        let _: () = on_update.call(())?;
 
         let elapsed = start.elapsed().unwrap();
         let to_wait = Duration::from_millis(100) - elapsed;
@@ -133,12 +100,12 @@ where
 {
     pub fn load<F>(root: PathBuf, cb: F) -> Result<Package<M>, PackageError>
     where
-        F: Fn(Ctx) + Send + 'static,
+        F: Fn(&Lua) + Send + 'static,
     {
         println!("PACKAGE: load {}", root.display());
-        let indexjs = root.join("index.js");
+        let indexlua = root.join("index.luau");
 
-        if !indexjs.exists() {
+        if !indexlua.exists() {
             return Err(PackageError::not_a_package());
         }
 

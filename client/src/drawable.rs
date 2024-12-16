@@ -3,8 +3,8 @@ use std::{
     sync::{atomic::AtomicU32, Arc, RwLock},
 };
 
+use mlua::{FromLua, UserData};
 use raylib_sys::{DrawMeshInstanced, LoadModel, Material, Matrix, Model, Shader, UnloadModel};
-use rquickjs::class::Trace;
 
 use crate::{node::Node, rl_str};
 
@@ -90,14 +90,9 @@ impl Drop for Drawable {
     }
 }
 
-#[derive(Trace, Clone)]
-#[rquickjs::class]
-pub struct JsDrawable {
-    #[qjs(skip_trace)]
+pub struct LuaDrawable {
     pub id: u32,
-    #[qjs(skip_trace)]
     pub instances: DrawableInstances,
 }
 
-#[rquickjs::methods]
-impl JsDrawable {}
+impl UserData for LuaDrawable {}
