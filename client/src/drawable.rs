@@ -3,8 +3,10 @@ use std::{
     sync::{atomic::AtomicU32, Arc, RwLock},
 };
 
-use mlua::{FromLua, UserData};
-use raylib_sys::{DrawMeshInstanced, LoadModel, Material, Matrix, Model, Shader, UnloadModel};
+use mlua::UserData;
+use raylib_ffi::{
+    DrawMesh, DrawMeshInstanced, LoadModel, Material, Matrix, Model, Shader, UnloadModel,
+};
 
 use crate::{node::Node, rl_str};
 
@@ -70,15 +72,18 @@ impl Drawable {
         for (i, n) in instaces.values().enumerate() {
             let n = n.read().unwrap();
             matrix_2_raylib(&n.transform_world, &mut matrices[i]);
+            unsafe {
+                DrawMesh(*self.model.meshes.offset(0), self.material, matrices[i]);
+            }
         }
-        unsafe {
-            DrawMeshInstanced(
-                *self.model.meshes.offset(0),
-                self.material,
-                matrices.as_ptr(),
-                matrices.len() as _,
-            );
-        }
+        // unsafe {
+        //     DrawMeshInstanced(
+        //         *self.model.meshes.offset(0),
+        //         self.material,
+        //         matrices.as_ptr(),
+        //         matrices.len() as _,
+        //     );
+        // }
     }
 }
 

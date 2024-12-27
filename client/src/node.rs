@@ -7,7 +7,7 @@ use std::{
 };
 
 use mlua::AnyUserData;
-use raylib_sys::Matrix;
+use raylib_ffi::Matrix;
 
 use crate::drawable::{DrawableInstances, LuaDrawable};
 
@@ -120,6 +120,13 @@ impl mlua::UserData for LuaNode {
         methods.add_method("rotateZ", |_lua, me, a: f32| {
             let mut n = me.inner.write().unwrap();
             common::matrix::rotate_z(&mut n.transform, a);
+            Ok(())
+        });
+
+        methods.add_method("scale", |_lua, me, a: Vec<f32>| {
+            let mut n = me.inner.write().unwrap();
+            let v = [a[0], a[1], a[2]];
+            common::matrix::scale(&mut n.transform, &v);
             Ok(())
         });
     }

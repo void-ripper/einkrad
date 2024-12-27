@@ -7,4 +7,5 @@ edition.workspace = true
 common = { path = "../common" }
 mlua = { version = "0.10.2", features = ["luau-jit", "vendored"] }
 package = { path = "../package" }
-raylib-sys = "5.0.2"
+raylib-ffi = "5.5.0"
+# raylib-sys = "5.0.2"

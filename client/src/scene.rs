@@ -10,10 +10,10 @@ use std::{
 
 use mlua::{AnyUserData, UserData};
 use package::App;
-use raylib_sys::{
-    BeginMode3D, Camera, CameraProjection, DrawSphereEx, EndMode3D, GetShaderLocation,
-    GetShaderLocationAttrib, LoadShader, SetShaderValue, Shader, ShaderLocationIndex,
-    ShaderUniformDataType, Vector3,
+use raylib_ffi::{
+    enums::{CameraProjection, ShaderLocationIndex, ShaderUniformDataType},
+    BeginMode3D, Camera, DrawSphereEx, EndMode3D, GetShaderLocation, GetShaderLocationAttrib,
+    LoadShader, SetShaderValue, Shader, Vector3,
 };
 
 use crate::{
@@ -56,32 +56,37 @@ impl Scene {
                 z: 0.0,
             },
             fovy: 45.0,
-            projection: CameraProjection::CAMERA_PERSPECTIVE as i32,
+            projection: CameraProjection::Perspective as i32,
         };
 
         let shader = unsafe {
             LoadShader(
-                rl_str!("data/lighting_instancing.vs"),
-                // rl_str!("data/lighting.vs"),
+                // rl_str!("data/lighting_instancing.vs"),
+                rl_str!("data/lighting.vs"),
                 rl_str!("data/lighting.fs"),
             )
         };
 
         let view_loc = unsafe {
-            let view_loc = shader
-                .locs
-                .offset(ShaderLocationIndex::SHADER_LOC_VERTEX_POSITION as isize);
+            let view_loc = shader.locs.offset(ShaderLocationIndex::VectorView as isize);
             *view_loc = GetShaderLocation(shader, rl_str!("viewPos"));
+            // println!("VIEW: {}", *view_loc);
 
-            let mat_model = shader
-                .locs
-                .offset(ShaderLocationIndex::SHADER_LOC_MATRIX_MVP as isize);
+            let mat_model = shader.locs.offset(ShaderLocationIndex::MatrixMvp as isize);
             *mat_model = GetShaderLocation(shader, rl_str!("mvp"));
+            // println!("MODEL: {}", *mat_model);
 
             let mat_model = shader
                 .locs
-                .offset(ShaderLocationIndex::SHADER_LOC_MATRIX_MODEL as isize);
-            *mat_model = GetShaderLocationAttrib(shader, rl_str!("instanceTransform"));
+                .offset(ShaderLocationIndex::MatrixModel as isize);
+            // *mat_model = GetShaderLocationAttrib(shader, rl_str!("instanceTransform"));
+            *mat_model = GetShaderLocation(shader, rl_str!("matModel"));
+            // println!("INSTANCE: {}", *mat_model);
+            // let normal = GetShaderLocationAttrib(shader, rl_str!("vertexNormal"));
+            // let normal_loc = shader
+            //     .locs
+            //     .offset(ShaderLocationIndex::VertexNormal as isize);
+            // println!("NORMAL: {} {}", normal, *normal_loc);
 
             let ambient_loc = GetShaderLocation(shader, rl_str!("ambient"));
             let ambient_value = [0.1f32, 0.1f32, 0.1f32, 1.0f32].as_ptr();
@@ -89,7 +94,7 @@ impl Scene {
                 shader,
                 ambient_loc,
                 ambient_value as *const c_void,
-                ShaderUniformDataType::SHADER_UNIFORM_IVEC4 as i32,
+                ShaderUniformDataType::Vec4 as i32,
             );
 
             *view_loc
@@ -150,7 +155,7 @@ impl Scene {
                 self.shader,
                 self.view_loc,
                 camera_pos as *mut c_void,
-                ShaderUniformDataType::SHADER_UNIFORM_IVEC3 as c_int,
+                ShaderUniformDataType::Vec3 as c_int,
             );
             BeginMode3D(self.camera);
 

@@ -1,7 +1,7 @@
 use std::os::raw::c_void;
 
-use raylib_sys::{
-    Color, GetShaderLocation, SetShaderValue, Shader, ShaderUniformDataType, Vector3,
+use raylib_ffi::{
+    enums::ShaderUniformDataType, Color, GetShaderLocation, SetShaderValue, Shader, Vector3,
 };
 
 #[derive(Debug)]
@@ -69,14 +69,14 @@ impl Light {
                 shader,
                 self.enabled_loc,
                 enabled as *const c_void,
-                ShaderUniformDataType::SHADER_UNIFORM_INT as i32,
+                ShaderUniformDataType::Int as i32,
             );
             let kind = [self.kind].as_ptr();
             SetShaderValue(
                 shader,
                 self.kind_loc,
                 kind as *const c_void,
-                ShaderUniformDataType::SHADER_UNIFORM_INT as i32,
+                ShaderUniformDataType::Int as i32,
             );
 
             let position = [self.position.x, self.position.y, self.position.z].as_ptr();
@@ -84,7 +84,7 @@ impl Light {
                 shader,
                 self.position_loc,
                 position as *const c_void,
-                ShaderUniformDataType::SHADER_UNIFORM_VEC3 as i32,
+                ShaderUniformDataType::Vec3 as i32,
             );
 
             let target = [self.position.x, self.position.y, self.position.z].as_ptr();
@@ -92,7 +92,7 @@ impl Light {
                 shader,
                 self.target_loc,
                 target as *const c_void,
-                ShaderUniformDataType::SHADER_UNIFORM_VEC3 as i32,
+                ShaderUniformDataType::Vec3 as i32,
             );
 
             let color = [
@@ -106,7 +106,7 @@ impl Light {
                 shader,
                 self.color_loc,
                 color as *const c_void,
-                ShaderUniformDataType::SHADER_UNIFORM_VEC4 as i32,
+                ShaderUniformDataType::Vec4 as i32,
             );
         }
     }

@@ -9,8 +9,8 @@ use message::ServiceMessage;
 use mlua::AnyUserData;
 use node::{LuaNode, Node};
 use package::Package;
-use raylib_sys::{
-    BeginDrawing, ClearBackground, CloseWindow, Color, ConfigFlags, DrawFPS, EndDrawing,
+use raylib_ffi::{
+    enums::ConfigFlags, BeginDrawing, ClearBackground, CloseWindow, Color, DrawFPS, EndDrawing,
     InitWindow, SetConfigFlags, SetTargetFPS, WindowShouldClose,
 };
 use scene::{lua_scene_new, LuaScene, Scene};
@@ -95,7 +95,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     unsafe {
-        SetConfigFlags(ConfigFlags::FLAG_MSAA_4X_HINT as u32);
+        SetConfigFlags(ConfigFlags::Msaa4xHint as u32);
         InitWindow(1024, 768, rl_str!("Einkrad"));
         SetTargetFPS(60);
 
