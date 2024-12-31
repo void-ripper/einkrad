@@ -70,18 +70,18 @@ impl Scene {
         let view_loc = unsafe {
             let view_loc = shader.locs.offset(ShaderLocationIndex::VectorView as isize);
             *view_loc = GetShaderLocation(shader, rl_str!("viewPos"));
-            // println!("VIEW: {}", *view_loc);
+            println!("VIEW: {}", *view_loc);
 
             let mat_model = shader.locs.offset(ShaderLocationIndex::MatrixMvp as isize);
             *mat_model = GetShaderLocation(shader, rl_str!("mvp"));
-            // println!("MODEL: {}", *mat_model);
+            println!("MODEL: {}", *mat_model);
 
             let mat_model = shader
                 .locs
                 .offset(ShaderLocationIndex::MatrixModel as isize);
             // *mat_model = GetShaderLocationAttrib(shader, rl_str!("instanceTransform"));
             *mat_model = GetShaderLocation(shader, rl_str!("matModel"));
-            // println!("INSTANCE: {}", *mat_model);
+            println!("INSTANCE: {}", *mat_model);
             // let normal = GetShaderLocationAttrib(shader, rl_str!("vertexNormal"));
             // let normal_loc = shader
             //     .locs
