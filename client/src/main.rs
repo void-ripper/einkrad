@@ -43,10 +43,6 @@ impl mlua::UserData for Game {
     }
 
     fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {
-        methods.add_method("newNode", |_lua, _me, _: ()| {
-            Ok(LuaNode { inner: Node::new() })
-        });
-
         methods.add_method("setScene", |_lua, me, scene: AnyUserData| {
             let id = scene.borrow_scoped(|s: &LuaScene| s.id)?;
             me.tx.send(GameMessage::SetLevel(id)).unwrap();

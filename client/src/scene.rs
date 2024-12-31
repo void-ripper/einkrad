@@ -13,7 +13,7 @@ use package::App;
 use raylib_ffi::{
     enums::{CameraProjection, ShaderLocationIndex, ShaderUniformDataType},
     BeginMode3D, Camera, DrawSphereEx, EndMode3D, GetShaderLocation, GetShaderLocationAttrib,
-    LoadShader, SetShaderValue, Shader, Vector3,
+    LoadShader, LoadShaderFromMemory, SetShaderValue, Shader, Vector3,
 };
 
 use crate::{
@@ -25,6 +25,8 @@ use crate::{
 };
 
 static ID_POOL: AtomicU32 = AtomicU32::new(1);
+// static VERTEX_SHADER: &str = include_str!("lighting.vs");
+// static FRAGMENT_SHADER: &str = include_str!("lighting.fs");
 
 pub struct Scene {
     pub id: u32,
@@ -61,27 +63,31 @@ impl Scene {
 
         let shader = unsafe {
             LoadShader(
-                // rl_str!("data/lighting_instancing.vs"),
-                rl_str!("data/lighting.vs"),
-                rl_str!("data/lighting.fs"),
+                rl_str!("client/src/lighting.vs"),
+                rl_str!("client/src/lighting.fs"),
             )
+            // LoadShaderFromMemory(
+            //     // rl_str!("data/lighting_instancing.vs"),
+            //     VERTEX_SHADER.as_ptr() as _,
+            //     FRAGMENT_SHADER.as_ptr() as _,
+            // )
         };
 
         let view_loc = unsafe {
             let view_loc = shader.locs.offset(ShaderLocationIndex::VectorView as isize);
             *view_loc = GetShaderLocation(shader, rl_str!("viewPos"));
-            println!("VIEW: {}", *view_loc);
+            // println!("VIEW: {}", *view_loc);
 
             let mat_model = shader.locs.offset(ShaderLocationIndex::MatrixMvp as isize);
             *mat_model = GetShaderLocation(shader, rl_str!("mvp"));
-            println!("MODEL: {}", *mat_model);
+            // println!("MODEL: {}", *mat_model);
 
             let mat_model = shader
                 .locs
                 .offset(ShaderLocationIndex::MatrixModel as isize);
             // *mat_model = GetShaderLocationAttrib(shader, rl_str!("instanceTransform"));
             *mat_model = GetShaderLocation(shader, rl_str!("matModel"));
-            println!("INSTANCE: {}", *mat_model);
+            // println!("INSTANCE: {}", *mat_model);
             // let normal = GetShaderLocationAttrib(shader, rl_str!("vertexNormal"));
             // let normal_loc = shader
             //     .locs
