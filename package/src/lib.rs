@@ -27,6 +27,7 @@ impl<M> App<M> {
 impl<M> UserData for App<M> {}
 
 pub struct Package<M> {
+    pub name: String,
     pub msg_tx: Sender<String>,
     pub service_rx: Receiver<M>,
     pub service_tx: Sender<M>,
@@ -35,12 +36,13 @@ pub struct Package<M> {
 fn run_package<F, M: 'static>(
     cb: F,
     root: PathBuf,
+    name_tx: mpsc::SyncSender<String>,
     msg_rx: Receiver<String>,
     service_tx: Sender<M>,
     service_rx: Receiver<M>,
 ) -> Result<(), PackageError>
 where
-    F: Fn(&Lua),
+    F: Fn(&Lua) -> Result<(), Box<dyn std::error::Error>>,
 {
     let indexlua = root.join("index.luau");
     let rt = Lua::new();
@@ -58,7 +60,7 @@ where
         })?;
         globals.set("require", require)?;
 
-        cb(&rt);
+        cb(&rt)?;
     }
 
     rt.set_named_registry_value(
@@ -71,6 +73,10 @@ where
 
     let data = std::fs::read_to_string(&indexlua)?;
     rt.load(&data).exec()?;
+
+    let name: String = rt.globals().get("Name")?;
+    name_tx.send(name)?;
+    drop(name_tx);
 
     let on_start: mlua::Function = rt.globals().get("OnStart")?;
 
@@ -100,7 +106,7 @@ where
 {
     pub fn load<F>(root: PathBuf, cb: F) -> Result<Package<M>, PackageError>
     where
-        F: Fn(&Lua) + Send + 'static,
+        F: Fn(&Lua) -> Result<(), Box<dyn std::error::Error>> + Send + 'static,
     {
         println!("PACKAGE: load {}", root.display());
         let indexlua = root.join("index.luau");
@@ -112,14 +118,18 @@ where
         let (tx, rx) = mpsc::channel();
         let (rtx, rrx) = mpsc::channel();
         let (atx, arx) = mpsc::channel();
+        let (otx, orx) = mpsc::sync_channel(1);
 
         std::thread::spawn(move || {
-            if let Err(e) = run_package(cb, root.clone(), rx, rtx, arx) {
+            if let Err(e) = run_package(cb, root.clone(), otx, rx, rtx, arx) {
                 println!("PACKAGE {}: {}", root.display(), e);
             }
         });
 
+        let name: String = orx.recv()?;
+
         Ok(Self {
+            name,
             msg_tx: tx,
             service_tx: atx,
             service_rx: rrx,

@@ -5,6 +5,8 @@ pub enum PackageErrorKind {
     NotAPackage,
     Lua,
     Io,
+    Sync,
+    Generic,
 }
 
 #[derive(Debug)]
@@ -43,6 +45,33 @@ impl From<std::io::Error> for PackageError {
     fn from(value: std::io::Error) -> Self {
         Self {
             kind: PackageErrorKind::Io,
+            msg: value.to_string(),
+        }
+    }
+}
+
+impl From<std::sync::mpsc::RecvError> for PackageError {
+    fn from(value: std::sync::mpsc::RecvError) -> Self {
+        Self {
+            kind: PackageErrorKind::Sync,
+            msg: value.to_string(),
+        }
+    }
+}
+
+impl<T> From<std::sync::mpsc::SendError<T>> for PackageError {
+    fn from(value: std::sync::mpsc::SendError<T>) -> Self {
+        Self {
+            kind: PackageErrorKind::Sync,
+            msg: value.to_string(),
+        }
+    }
+}
+
+impl From<Box<dyn std::error::Error>> for PackageError {
+    fn from(value: Box<dyn std::error::Error>) -> Self {
+        Self {
+            kind: PackageErrorKind::Generic,
             msg: value.to_string(),
         }
     }

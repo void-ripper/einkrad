@@ -47,10 +47,6 @@ impl mlua::UserData for Game {
             Ok(LuaNode { inner: Node::new() })
         });
 
-        methods.add_method("newScene", |lua, _me, name: String| {
-            lua_scene_new(lua, name)
-        });
-
         methods.add_method("setScene", |_lua, me, scene: AnyUserData| {
             let id = scene.borrow_scoped(|s: &LuaScene| s.id)?;
             me.tx.send(GameMessage::SetLevel(id)).unwrap();
@@ -74,21 +70,31 @@ fn main() -> Result<(), Box<dyn Error>> {
             match Package::<ServiceMessage>::load(entry.path(), move |c| {
                 let globals = c.globals();
 
-                globals
-                    .set(
-                        "Game",
-                        Game {
-                            tx: gtx.clone(),
-                            is_server: false,
-                        },
-                    )
-                    .unwrap();
+                globals.set(
+                    "Game",
+                    Game {
+                        tx: gtx.clone(),
+                        is_server: false,
+                    },
+                )?;
+
+                let scene = c.create_table()?;
+                let func = c.create_function(lua_scene_new)?;
+                scene.set("new", func)?;
+                globals.set("Scene", scene)?;
+
+                let node = c.create_table()?;
+                let func = c.create_function(|_lua, _: ()| Ok(LuaNode { inner: Node::new() }))?;
+                node.set("new", func)?;
+                globals.set("Node", node)?;
+
+                Ok(())
             }) {
                 Ok(pk) => {
                     plugins.push(pk);
                 }
                 Err(e) => {
-                    println!("{e}");
+                    println!("EINKRAD: {e}");
                 }
             }
         }
@@ -124,7 +130,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                             }
                         }
                         ServiceMessage::CreatedScene(..) | ServiceMessage::LoadedDrawable(..) => {
-                            println!("we should not get this");
+                            println!("EINKRAD: we should not get this");
                         }
                     }
                 }
