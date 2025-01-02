@@ -30,6 +30,7 @@ macro_rules! rl_str {
 
 enum GameMessage {
     SetLevel(u32),
+    SetTargetFPS(u32),
 }
 
 struct Game {
@@ -46,6 +47,11 @@ impl mlua::UserData for Game {
         methods.add_method("setScene", |_lua, me, scene: AnyUserData| {
             let id = scene.borrow_scoped(|s: &LuaScene| s.id)?;
             me.tx.send(GameMessage::SetLevel(id)).unwrap();
+            Ok(())
+        });
+
+        methods.add_method("setTargetFPS", |_lua, me, fps: u32| {
+            me.tx.send(GameMessage::SetTargetFPS(fps)).unwrap();
             Ok(())
         });
     }
@@ -136,6 +142,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                 match msg {
                     GameMessage::SetLevel(id) => {
                         active_scene = id;
+                    }
+                    GameMessage::SetTargetFPS(fps) => {
+                        SetTargetFPS(fps as _);
                     }
                 }
             }
