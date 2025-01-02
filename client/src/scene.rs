@@ -149,6 +149,8 @@ impl Scene {
             }
         }
 
+        self.lights[0].update(self.shader);
+
         unsafe {
             // UpdateCamera(&mut self.camera, enums::CameraMode::Orbital as i32);
             let camera_pos = [

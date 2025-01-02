@@ -1,6 +1,7 @@
 [profile.release]
 strip = true
-opt-level = 0
+lto = true
+panic = "abort"
 
 [profile.dev]
 strip = true
