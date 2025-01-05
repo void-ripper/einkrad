@@ -95,7 +95,7 @@ where
         let _: () = on_update.call(())?;
 
         let elapsed = start.elapsed().unwrap();
-        let to_wait = Duration::from_millis(100) - elapsed;
+        let to_wait = Duration::from_millis(25) - elapsed;
         std::thread::sleep(to_wait);
     }
 }

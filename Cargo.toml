@@ -2,9 +2,11 @@
 strip = true
 lto = true
 panic = "abort"
+opt-level = 0
 
 [profile.dev]
 strip = true
+# opt-level = 1
 
 [workspace.package]
 version = "0.1.0"

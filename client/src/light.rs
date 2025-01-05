@@ -1,7 +1,7 @@
-use std::os::raw::c_void;
+use std::{ffi::CString, os::raw::c_void};
 
-use raylib_ffi::{
-    enums::ShaderUniformDataType, Color, GetShaderLocation, SetShaderValue, Shader, Vector3,
+use raylib::ffi::{
+    Color, GetShaderLocation, SetShaderValue, Shader, ShaderUniformDataType, Vector3,
 };
 
 #[derive(Debug)]
@@ -21,15 +21,21 @@ pub struct Light {
 
 impl Light {
     pub fn new(shader: Shader, id: i32) -> Self {
-        let me = unsafe {
+        unsafe {
+            let enable_name = CString::new(format!("lights[{}].enabled", id)).unwrap();
+            let type_name = CString::new(format!("lights[{}].type", id)).unwrap();
+            let position_name = CString::new(format!("lights[{}].position", id)).unwrap();
+            let target_name = CString::new(format!("lights[{}].target", id)).unwrap();
+            let color_name = CString::new(format!("lights[{}].color", id)).unwrap();
+
             Self {
                 id,
                 enabled: 1,
                 kind: 1,
                 position: Vector3 {
-                    x: 0.0,
-                    y: 1.0,
-                    z: 1.0,
+                    x: 2.0,
+                    y: 3.0,
+                    z: 2.0,
                 },
                 target: Vector3 {
                     x: 0.0,
@@ -42,24 +48,13 @@ impl Light {
                     b: 255,
                     a: 255,
                 },
-                enabled_loc: GetShaderLocation(
-                    shader,
-                    format!("lights[{}].enabled", id).as_ptr() as _,
-                ),
-                kind_loc: GetShaderLocation(shader, format!("lights[{}].type", id).as_ptr() as _),
-                position_loc: GetShaderLocation(
-                    shader,
-                    format!("lights[{}].position", id).as_ptr() as _,
-                ),
-                target_loc: GetShaderLocation(
-                    shader,
-                    format!("lights[{}].target", id).as_ptr() as _,
-                ),
-                color_loc: GetShaderLocation(shader, format!("lights[{}].color", id).as_ptr() as _),
+                enabled_loc: GetShaderLocation(shader, enable_name.as_ptr()),
+                kind_loc: GetShaderLocation(shader, type_name.as_ptr()),
+                position_loc: GetShaderLocation(shader, position_name.as_ptr()),
+                target_loc: GetShaderLocation(shader, target_name.as_ptr()),
+                color_loc: GetShaderLocation(shader, color_name.as_ptr()),
             }
-        };
-
-        me
+        }
     }
 
     pub fn update(&self, shader: Shader) {
@@ -68,15 +63,17 @@ impl Light {
             SetShaderValue(
                 shader,
                 self.enabled_loc,
-                enabled as *const c_void,
-                ShaderUniformDataType::Int as i32,
+                // enabled as *const c_void,
+                &self.enabled as *const i32 as _,
+                ShaderUniformDataType::SHADER_UNIFORM_INT as i32,
             );
             let kind = [self.kind].as_ptr();
             SetShaderValue(
                 shader,
                 self.kind_loc,
-                kind as *const c_void,
-                ShaderUniformDataType::Int as i32,
+                // kind as *const c_void,
+                &self.kind as *const i32 as _,
+                ShaderUniformDataType::SHADER_UNIFORM_INT as i32,
             );
 
             let position = [self.position.x, self.position.y, self.position.z].as_ptr();
@@ -84,15 +81,15 @@ impl Light {
                 shader,
                 self.position_loc,
                 position as *const c_void,
-                ShaderUniformDataType::Vec3 as i32,
+                ShaderUniformDataType::SHADER_UNIFORM_VEC3 as i32,
             );
 
-            let target = [self.position.x, self.position.y, self.position.z].as_ptr();
+            let target = [self.target.x, self.target.y, self.target.z].as_ptr();
             SetShaderValue(
                 shader,
                 self.target_loc,
                 target as *const c_void,
-                ShaderUniformDataType::Vec3 as i32,
+                ShaderUniformDataType::SHADER_UNIFORM_VEC3 as i32,
             );
 
             let color = [
@@ -105,8 +102,8 @@ impl Light {
             SetShaderValue(
                 shader,
                 self.color_loc,
-                color as *const c_void,
-                ShaderUniformDataType::Vec4 as i32,
+                color as _,
+                ShaderUniformDataType::SHADER_UNIFORM_VEC4 as i32,
             );
         }
     }

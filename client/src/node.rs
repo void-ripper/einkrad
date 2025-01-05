@@ -7,7 +7,7 @@ use std::{
 };
 
 use mlua::AnyUserData;
-use raylib_ffi::Matrix;
+use raylib::ffi::Matrix;
 
 use crate::drawable::{DrawableInstances, LuaDrawable};
 

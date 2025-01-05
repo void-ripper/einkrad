@@ -1,6 +1,6 @@
 use std::{
     collections::{HashMap, VecDeque},
-    ffi::c_int,
+    ffi::{c_int, CString},
     os::raw::c_void,
     sync::{
         atomic::{AtomicU32, Ordering},
@@ -10,10 +10,10 @@ use std::{
 
 use mlua::{AnyUserData, UserData};
 use package::App;
-use raylib_ffi::{
-    enums::{CameraProjection, ShaderLocationIndex, ShaderUniformDataType},
-    BeginMode3D, Camera, DrawSphereEx, EndMode3D, GetShaderLocation, GetShaderLocationAttrib,
-    LoadShader, LoadShaderFromMemory, SetShaderValue, Shader, Vector3,
+use raylib::ffi::{
+    BeginMode3D, Camera, CameraProjection, DrawSphereEx, EndMode3D, GetShaderLocation,
+    LoadShaderFromMemory, SetShaderValue, Shader, ShaderLocationIndex, ShaderUniformDataType,
+    Vector3,
 };
 
 use crate::{
@@ -21,12 +21,9 @@ use crate::{
     light::Light,
     message::ServiceMessage,
     node::{LuaNode, Node},
-    rl_str,
 };
 
 static ID_POOL: AtomicU32 = AtomicU32::new(1);
-// static VERTEX_SHADER: &str = include_str!("lighting.vs");
-// static FRAGMENT_SHADER: &str = include_str!("lighting.fs");
 
 pub struct Scene {
     pub id: u32,
@@ -35,7 +32,7 @@ pub struct Scene {
     pub root: Arc<RwLock<Node>>,
     lights: Vec<Light>,
     pub camera: Camera,
-    shader: Shader,
+    pub shader: Shader,
     view_loc: i32,
 }
 
@@ -43,13 +40,13 @@ impl Scene {
     pub fn new(name: String) -> Self {
         let camera = Camera {
             position: Vector3 {
-                x: 2.0,
-                y: 4.0,
+                x: 0.0,
+                y: 2.0,
                 z: 6.0,
             },
             target: Vector3 {
                 x: 0.0,
-                y: 0.5,
+                y: 2.0,
                 z: 0.0,
             },
             up: Vector3 {
@@ -57,36 +54,41 @@ impl Scene {
                 y: 1.0,
                 z: 0.0,
             },
-            fovy: 45.0,
-            projection: CameraProjection::Perspective as i32,
+            fovy: 60.0,
+            projection: CameraProjection::CAMERA_PERSPECTIVE as i32,
         };
 
+        let VERTEX_SHADER: CString = CString::new(include_str!("lighting.vs")).unwrap();
+        let FRAGMENT_SHADER: CString = CString::new(include_str!("lighting.fs")).unwrap();
         let shader = unsafe {
-            LoadShader(
-                rl_str!("client/src/lighting.vs"),
-                rl_str!("client/src/lighting.fs"),
-            )
-            // LoadShaderFromMemory(
-            //     // rl_str!("data/lighting_instancing.vs"),
-            //     VERTEX_SHADER.as_ptr() as _,
-            //     FRAGMENT_SHADER.as_ptr() as _,
+            // LoadShader(
+            //     rl_str!("client/src/lighting.vs"),
+            //     rl_str!("client/src/lighting.fs"),
             // )
+            LoadShaderFromMemory(
+                // rl_str!("data/lighting_instancing.vs"),
+                VERTEX_SHADER.as_ptr() as _,
+                FRAGMENT_SHADER.as_ptr() as _,
+            )
         };
 
         let view_loc = unsafe {
-            let view_loc = shader.locs.offset(ShaderLocationIndex::VectorView as isize);
-            *view_loc = GetShaderLocation(shader, rl_str!("viewPos"));
+            let view_loc = shader
+                .locs
+                .offset(ShaderLocationIndex::SHADER_LOC_VECTOR_VIEW as isize);
+            let view_pos_name = CString::new("viewPos").unwrap();
+            *view_loc = GetShaderLocation(shader, view_pos_name.as_ptr());
             // println!("VIEW: {}", *view_loc);
 
-            let mat_model = shader.locs.offset(ShaderLocationIndex::MatrixMvp as isize);
-            *mat_model = GetShaderLocation(shader, rl_str!("mvp"));
+            // let mat_model = shader.locs.offset(ShaderLocationIndex::MatrixMvp as isize);
+            // *mat_model = GetShaderLocation(shader, rl_str!("mvp"));
             // println!("MODEL: {}", *mat_model);
 
-            let mat_model = shader
-                .locs
-                .offset(ShaderLocationIndex::MatrixModel as isize);
+            // let mat_model = shader
+            //     .locs
+            //     .offset(ShaderLocationIndex::MatrixModel as isize);
             // *mat_model = GetShaderLocationAttrib(shader, rl_str!("instanceTransform"));
-            *mat_model = GetShaderLocation(shader, rl_str!("matModel"));
+            // *mat_model = GetShaderLocation(shader, rl_str!("matModel"));
             // println!("INSTANCE: {}", *mat_model);
             // let normal = GetShaderLocationAttrib(shader, rl_str!("vertexNormal"));
             // let normal_loc = shader
@@ -94,20 +96,21 @@ impl Scene {
             //     .offset(ShaderLocationIndex::VertexNormal as isize);
             // println!("NORMAL: {} {}", normal, *normal_loc);
 
-            let ambient_loc = GetShaderLocation(shader, rl_str!("ambient"));
+            let ambient_name = CString::new("ambient").unwrap();
+            let ambient_loc = GetShaderLocation(shader, ambient_name.as_ptr());
             let ambient_value = [0.1f32, 0.1f32, 0.1f32, 1.0f32].as_ptr();
             SetShaderValue(
                 shader,
                 ambient_loc,
                 ambient_value as *const c_void,
-                ShaderUniformDataType::Vec4 as i32,
+                ShaderUniformDataType::SHADER_UNIFORM_VEC4 as i32,
             );
 
             *view_loc
         };
 
         let light = Light::new(shader, 0);
-        light.update(shader);
+        //light.update(shader);
 
         Self {
             id: ID_POOL.fetch_add(1, Ordering::SeqCst),
@@ -129,7 +132,7 @@ impl Scene {
         (id, matrices)
     }
 
-    pub fn draw(&mut self) {
+    pub fn update(&mut self) {
         let mut stack = VecDeque::new();
         {
             let mut r = self.root.write().unwrap();
@@ -149,8 +152,6 @@ impl Scene {
             }
         }
 
-        self.lights[0].update(self.shader);
-
         unsafe {
             // UpdateCamera(&mut self.camera, enums::CameraMode::Orbital as i32);
             let camera_pos = [
@@ -163,12 +164,19 @@ impl Scene {
                 self.shader,
                 self.view_loc,
                 camera_pos as *mut c_void,
-                ShaderUniformDataType::Vec3 as c_int,
+                ShaderUniformDataType::SHADER_UNIFORM_VEC3 as c_int,
             );
+        }
+
+        self.lights[0].update(self.shader);
+    }
+
+    pub fn draw(&mut self) {
+        unsafe {
             BeginMode3D(self.camera);
 
             for drw in self.drawables.values() {
-                drw.draw();
+                drw.draw(self.shader);
             }
 
             DrawSphereEx(self.lights[0].position, 0.2, 8, 8, self.lights[0].color);
