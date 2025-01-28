@@ -5,56 +5,28 @@ use std::{
 };
 
 use mlua::UserData;
-use raylib::ffi::{DrawMesh, LoadModel, Matrix, Model, Shader};
 
 use crate::node::Node;
 
 static ID_POOL: AtomicU32 = AtomicU32::new(1);
 
-fn matrix_2_raylib(m: &[f32; 16], r: &mut Matrix) {
-    r.m0 = m[0];
-    r.m1 = m[1];
-    r.m2 = m[2];
-    r.m3 = m[3];
-    r.m4 = m[4];
-    r.m5 = m[5];
-    r.m6 = m[6];
-    r.m7 = m[7];
-    r.m8 = m[8];
-    r.m9 = m[9];
-    r.m10 = m[10];
-    r.m11 = m[11];
-    r.m12 = m[12];
-    r.m13 = m[13];
-    r.m14 = m[14];
-    r.m15 = m[15];
-}
-
 #[derive(Clone)]
 pub struct DrawableInstances {
-    pub matrices: Arc<RwLock<Vec<Matrix>>>,
+    pub matrices: Arc<RwLock<Vec<[f32; 16]>>>,
     pub instances: Arc<RwLock<HashMap<u32, Arc<RwLock<Node>>>>>,
 }
 
 pub struct Drawable {
     pub id: u32,
-    model: Model,
     pub instances: DrawableInstances,
 }
 
 impl Drawable {
-    pub fn new(shader: Shader, filename: &str) -> Self {
+    pub fn new(filename: &str) -> Self {
         let id = ID_POOL.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-        let model = unsafe {
-            let model_name = CString::new(filename).unwrap();
-            let model = LoadModel(model_name.as_ptr());
-            (*model.materials.offset(0)).shader = shader;
-            model
-        };
 
         Self {
             id,
-            model,
             instances: DrawableInstances {
                 matrices: Arc::new(RwLock::new(Vec::new())),
                 instances: Arc::new(RwLock::new(HashMap::new())),
@@ -62,55 +34,23 @@ impl Drawable {
         }
     }
 
-    pub fn draw(&self, shader: Shader) {
+    pub fn draw(&self) {
         //let mut matrices = self.instances.matrices.write().unwrap();
         let instaces = self.instances.instances.read().unwrap();
-
-        let mut matrix = Matrix {
-            m0: 1.0,
-            m1: 0.0,
-            m2: 0.0,
-            m3: 0.0,
-            m4: 0.0,
-            m5: 1.0,
-            m6: 0.0,
-            m7: 0.0,
-            m8: 0.0,
-            m9: 0.0,
-            m10: 1.0,
-            m11: 0.0,
-            m12: 0.0,
-            m13: 0.0,
-            m14: 0.0,
-            m15: 1.0,
-        };
-        for (i, n) in instaces.values().enumerate() {
-            let n = n.read().unwrap();
-            matrix_2_raylib(&n.transform_world, &mut matrix);
-            unsafe {
-                DrawMesh(
-                    *self.model.meshes.offset(0),
-                    *self.model.materials.offset(0),
-                    matrix,
-                );
-            }
+        unsafe {
+            gl::DrawElementsInstanced(
+                *self.model.meshes.offset(0),
+                self.material,
+                matrices.as_ptr(),
+                matrices.len() as _,
+            );
         }
-        // unsafe {
-        //     DrawMeshInstanced(
-        //         *self.model.meshes.offset(0),
-        //         self.material,
-        //         matrices.as_ptr(),
-        //         matrices.len() as _,
-        //     );
-        // }
     }
 }
 
 impl Drop for Drawable {
     fn drop(&mut self) {
-        unsafe {
-            //UnloadModel(self.model);
-        }
+        unsafe {}
     }
 }
 

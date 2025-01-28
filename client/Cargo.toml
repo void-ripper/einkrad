@@ -5,9 +5,8 @@ edition.workspace = true
 
 [dependencies]
 common = { path = "../common" }
+gl = "0.14.0"
+gltf = "1.4.1"
 mlua = { version = "0.10.2", features = ["luau-jit", "vendored"] }
 package = { path = "../package" }
-raylib = "5.0.2"
-
-
-# raylib-sys = "5.0.2"
+sdl2 = { version = "0.37.0", features = ["bundled"] }
